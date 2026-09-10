@@ -3,9 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
 
-const isVercel = !!process.env.VERCEL || process.env.NEXT_PHASE === 'phase-production-build';
-const dbDir = isVercel ? '/tmp' : process.cwd();
-const dbPath = path.join(dbDir, 'nova.db');
+// Support Render persistent disk (/data) or custom DATA_DIR, fallback to cwd or /tmp for Vercel
+const dataDir = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp' : process.cwd());
+const dbPath = path.join(dataDir, 'nova.db');
 
 let dbInstance: Database.Database | null = null;
 
