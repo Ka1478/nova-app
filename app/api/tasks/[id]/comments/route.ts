@@ -1,11 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import connectMongoDB from '@/lib/mongodb';
+import Task from '@/models/Task';
+import User from '@/models/User';
+import mongoose from 'mongoose';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const { id } = params;
+
+    if (process.env.MONGODB_URI) {
+      await connectMongoDB();
+      const task = await Task.findById(id).lean().catch(() => null) ||
+                   await Task.findOne({ _id: id }).lean().catch(() => null);
+
+      if (!task) return NextResponse.json({ comments: [] });
+
+      const users = await User.find().lean();
+      const userMap = new Map(users.map((u: any) => [u._id.toString(), u]));
+
+      const comments = (task.comments || []).map((c: any) => {
+        const u = userMap.get(c.user_id?.toString());
+        return {
+          ...c,
+          id: c._id ? c._id.toString() : c.id,
+          user_name: u?.name || 'User',
+          user_avatar: u?.avatar_url,
+          user_role: u?.role,
+        };
+      });
+
+      return NextResponse.json({ comments });
+    }
+
+    // SQLite Fallback
     const db = getDb();
-    const taskId = parseInt(params.id);
+    const taskId = parseInt(id);
+    if (isNaN(taskId)) {
+      return NextResponse.json({ comments: [] });
+    }
 
     const comments = db.prepare(`
       SELECT c.*, u.name as user_name, u.avatar_url as user_avatar, u.role as user_role
@@ -28,11 +62,53 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const taskId = parseInt(params.id);
+    const { id } = params;
     const { content } = await req.json();
 
     if (!content || !content.trim()) {
       return NextResponse.json({ error: 'Comment content cannot be empty' }, { status: 400 });
+    }
+
+    if (process.env.MONGODB_URI) {
+      await connectMongoDB();
+      const task = await Task.findById(id).catch(() => null) ||
+                   await Task.findOne({ _id: id }).catch(() => null);
+
+      if (!task) {
+        return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      }
+
+      const users = await User.find().lean();
+      const userMap = new Map(users.map((u: any) => [u._id.toString(), u]));
+      const userDoc = userMap.get(user.id?.toString());
+
+      const commentId = new mongoose.Types.ObjectId().toString();
+      const newComment = {
+        _id: commentId,
+        id: commentId,
+        user_id: user.id,
+        content: content.trim(),
+        created_at: new Date().toISOString(),
+      };
+
+      task.comments = task.comments || [];
+      task.comments.push(newComment);
+      await task.save();
+
+      return NextResponse.json({
+        comment: {
+          ...newComment,
+          user_name: userDoc?.name || user.name || 'User',
+          user_avatar: userDoc?.avatar_url || user.avatar_url,
+          user_role: userDoc?.role || user.role,
+        }
+      }, { status: 201 });
+    }
+
+    // SQLite Fallback
+    const taskId = parseInt(id);
+    if (isNaN(taskId)) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
     const db = getDb();
@@ -46,7 +122,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       VALUES (?, ?, ?)
     `).run(taskId, user.id, content.trim());
 
-    // Log Activity
     db.prepare(`
       INSERT INTO activity_logs (project_id, task_id, user_id, action, details)
       VALUES (?, ?, ?, 'COMMENT_ADDED', ?)
