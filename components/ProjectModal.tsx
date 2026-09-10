@@ -18,7 +18,7 @@ export default function ProjectModal({
   const [priority, setPriority] = useState('Medium');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');
-  const [users, setUsers] = useState<Array<{ id: number; name: string; avatar_url?: string; role?: string }>>([]);
+  const [users, setUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -182,8 +182,8 @@ export default function ProjectModal({
 
           {/* Member Selection */}
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1.5">Assign Team Members ({users.length})</label>
-            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-slate-850 rounded-xl border border-slate-800">
+            <label className="text-xs font-semibold text-slate-300 block mb-1.5">Assign Team Members</label>
+            <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto p-2 bg-slate-850 rounded-xl border border-slate-800">
               {users.map((u) => {
                 const isSelected = selectedMembers.includes(u.id);
                 return (
@@ -197,11 +197,6 @@ export default function ProjectModal({
                         : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200'
                     }`}
                   >
-                    <img
-                      src={u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.name)}`}
-                      alt={u.name}
-                      className="w-4 h-4 rounded-full object-cover shrink-0 border border-slate-700"
-                    />
                     <span>{u.name}</span>
                   </button>
                 );

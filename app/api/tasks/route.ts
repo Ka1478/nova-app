@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import connectMongoDB from '@/lib/mongodb';
+import Task from '@/models/Task';
+import Project from '@/models/Project';
+import User from '@/models/User';
 
 export async function GET(req: NextRequest) {
   try {
-    const db = getDb();
     const searchParams = req.nextUrl.searchParams;
     const projectId = searchParams.get('projectId');
     const assigneeId = searchParams.get('assigneeId');
@@ -12,6 +15,51 @@ export async function GET(req: NextRequest) {
     const priority = searchParams.get('priority');
     const search = searchParams.get('search');
 
+    if (process.env.MONGODB_URI) {
+      await connectMongoDB();
+      const filter: any = {};
+      if (projectId) filter.project_id = projectId;
+      if (assigneeId) filter.assignee_id = assigneeId;
+      if (status && status !== 'All') filter.status = status;
+      if (priority && priority !== 'All') filter.priority = priority;
+      if (search) filter.title = { $regex: search, $options: 'i' };
+
+      const rawTasks = await Task.find(filter).sort({ updatedAt: -1 }).lean();
+      const projects = await Project.find().lean();
+      const users = await User.find().lean();
+
+      const projMap = new Map(projects.map((p: any) => [p._id.toString(), p]));
+      const userMap = new Map(users.map((u: any) => [u._id.toString(), u]));
+
+      const tasksParsed = rawTasks.map((t: any) => {
+        const proj = projMap.get(t.project_id?.toString());
+        const assignee = userMap.get(t.assignee_id?.toString());
+        const reporter = userMap.get(t.reporter_id?.toString());
+
+        return {
+          id: t._id.toString(),
+          project_id: t.project_id,
+          project_name: proj?.name,
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          priority: t.priority,
+          assignee_id: t.assignee_id,
+          assignee_name: assignee?.name,
+          assignee_avatar: assignee?.avatar_url,
+          reporter_name: reporter?.name,
+          due_date: t.due_date,
+          estimated_hours: t.estimated_hours,
+          logged_hours: t.logged_hours,
+          tags: t.tags || [],
+        };
+      });
+
+      return NextResponse.json({ tasks: tasksParsed });
+    }
+
+    // SQLite Fallback
+    const db = getDb();
     let query = `
       SELECT t.*, 
              p.name as project_name, p.category as project_category,
@@ -47,7 +95,6 @@ export async function GET(req: NextRequest) {
     }
 
     query += ` ORDER BY t.updated_at DESC`;
-
     const tasks = db.prepare(query).all(...params) as any[];
 
     const tasksParsed = tasks.map(t => ({
@@ -74,8 +121,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Project ID and task title are required' }, { status: 400 });
     }
 
-    const db = getDb();
+    if (process.env.MONGODB_URI) {
+      await connectMongoDB();
+      const newTask = await Task.create({
+        project_id,
+        title,
+        description: description || '',
+        status: status || 'To Do',
+        priority: priority || 'Medium',
+        assignee_id: assignee_id || null,
+        reporter_id: user.id,
+        due_date: due_date || '',
+        estimated_hours: estimated_hours || 0,
+        tags: tags || [],
+      });
 
+      return NextResponse.json({ id: newTask._id.toString(), message: 'Task created' }, { status: 201 });
+    }
+
+    // SQLite Fallback
+    const db = getDb();
     const result = db.prepare(`
       INSERT INTO tasks (project_id, title, description, status, priority, assignee_id, reporter_id, due_date, estimated_hours, tags)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -93,13 +158,6 @@ export async function POST(req: NextRequest) {
     );
 
     const taskId = result.lastInsertRowid as number;
-
-    // Log Activity
-    db.prepare(`
-      INSERT INTO activity_logs (project_id, task_id, user_id, action, details)
-      VALUES (?, ?, ?, 'TASK_CREATED', ?)
-    `).run(project_id, taskId, user.id, `Created task "${title}"`);
-
     return NextResponse.json({ id: taskId, message: 'Task created successfully' }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
