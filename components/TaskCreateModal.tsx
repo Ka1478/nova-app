@@ -14,11 +14,11 @@ export default function TaskCreateModal({
   isOpen: boolean;
   onClose: () => void;
   onTaskCreated: () => void;
-  defaultProjectId?: number;
+  defaultProjectId?: number | string;
   defaultStatus?: Task['status'];
 }) {
-  const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([]);
-  const [users, setUsers] = useState<Array<{ id: number; name: string }>>([]);
+  const [projects, setProjects] = useState<Array<{ id: number | string; name: string }>>([]);
+  const [users, setUsers] = useState<Array<{ id: number | string; name: string }>>([]);
   const [projectId, setProjectId] = useState<number | string>(defaultProjectId || '');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -44,11 +44,13 @@ export default function TaskCreateModal({
           if (!defaultProjectId && data.projects?.length > 0) {
             setProjectId(data.projects[0].id);
           }
-        });
+        })
+        .catch(console.error);
 
       fetch('/api/team')
         .then((res) => res.json())
-        .then((data) => setUsers(data.users || []));
+        .then((data) => setUsers(data.users || []))
+        .catch(console.error);
     }
   }, [isOpen, defaultProjectId, defaultStatus]);
 
@@ -79,12 +81,12 @@ export default function TaskCreateModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          project_id: Number(projectId),
+          project_id: projectId,
           title: title.trim(),
           description: description.trim(),
           status,
           priority,
-          assignee_id: assigneeId ? Number(assigneeId) : null,
+          assignee_id: assigneeId || null,
           due_date: dueDate,
           estimated_hours: Number(estimatedHours) || 0,
           tags,

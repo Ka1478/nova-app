@@ -27,13 +27,12 @@ export default function TaskModal({
   task: Task | null;
   onClose: () => void;
   onUpdate: (updatedTask: Partial<Task>) => void;
-  onDelete: (taskId: number) => void;
-  users?: Array<{ id: number; name: string; avatar_url?: string; role?: string }>;
+  onDelete: (taskId: any) => void;
+  users?: Array<{ id: number | string; name: string; avatar_url?: string; role?: string }>;
 }) {
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
-  const [newSubtask, setNewSubtask] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
 
   useEffect(() => {
@@ -74,8 +73,8 @@ export default function TaskModal({
     });
   };
 
-  const handleAssigneeChange = (assignee_id: number) => {
-    const assignedUser = users.find(u => u.id === assignee_id);
+  const handleAssigneeChange = (assignee_id: number | string) => {
+    const assignedUser = users.find(u => String(u.id) === String(assignee_id));
     setDetails({ ...details, assignee_id, assignee_name: assignedUser?.name });
     onUpdate({ id: task.id, assignee_id, assignee_name: assignedUser?.name });
     fetch(`/api/tasks/${task.id}`, {
@@ -117,7 +116,7 @@ export default function TaskModal({
         <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-850">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-1 rounded-md bg-brand-500/10 text-brand-400 text-xs font-semibold border border-brand-500/20">
-              TASK #{task.id}
+              TASK #{String(task.id).substring(0, 8)}
             </span>
             <span className="text-xs text-slate-400">In {details?.project_name || task.project_name || 'Project'}</span>
           </div>
@@ -176,12 +175,12 @@ export default function TaskModal({
               <label className="text-xs font-semibold text-slate-400 block mb-1.5">Assignee</label>
               <select
                 value={currentAssignee || ''}
-                onChange={(e) => handleAssigneeChange(parseInt(e.target.value))}
+                onChange={(e) => handleAssigneeChange(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500"
               >
                 <option value="">Unassigned</option>
                 {users.map((u) => (
-                  <option key={u.id} value={u.id}>
+                  <option key={String(u.id)} value={String(u.id)}>
                     {u.name} ({u.role || 'Member'})
                   </option>
                 ))}
@@ -205,8 +204,8 @@ export default function TaskModal({
                 Checklist / Subtasks
               </h3>
               <div className="space-y-2 bg-slate-850 p-4 rounded-xl border border-slate-800">
-                {details.checklists.map((item: any) => (
-                  <div key={item.id} className="flex items-center gap-3 text-xs text-slate-300">
+                {details.checklists.map((item: any, idx: number) => (
+                  <div key={idx} className="flex items-center gap-3 text-xs text-slate-300">
                     <input
                       type="checkbox"
                       checked={!!item.is_completed}
@@ -229,8 +228,8 @@ export default function TaskModal({
 
             <div className="space-y-3 mb-4">
               {details?.comments && details.comments.length > 0 ? (
-                details.comments.map((comment: any) => (
-                  <div key={comment.id} className="bg-slate-850 p-3.5 rounded-xl border border-slate-800 flex gap-3">
+                details.comments.map((comment: any, idx: number) => (
+                  <div key={idx} className="bg-slate-850 p-3.5 rounded-xl border border-slate-800 flex gap-3">
                     <img
                       src={comment.user_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_name}`}
                       alt={comment.user_name}
