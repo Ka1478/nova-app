@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
              SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) as completed_tasks
       FROM users u
       LEFT JOIN tasks t ON t.assignee_id = u.id
-      GROUP BY u.id
-      ORDER BY u.name ASC
+      GROUP BY u.id, u.name, u.email, u.role, u.department, u.avatar_url, u.created_at
+      ORDER BY u.id DESC
     `).all() as any[];
 
     return NextResponse.json({ users });
