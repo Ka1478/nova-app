@@ -81,7 +81,7 @@ export default function ProjectWorkspacePage() {
 
   const { project, members = [], tasks = [], activity = [] } = projectData;
 
-  const handleTaskStatusChange = async (taskId: number, newStatus: Task['status']) => {
+  const handleTaskStatusChange = async (taskId: number | string, newStatus: Task['status']) => {
     // Optimistic UI update
     setProjectData((prev: any) => ({
       ...prev,
@@ -100,7 +100,7 @@ export default function ProjectWorkspacePage() {
     }
   };
 
-  const handleTaskDelete = async (taskId: number) => {
+  const handleTaskDelete = async (taskId: number | string) => {
     try {
       await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
       fetchProjectDetails();

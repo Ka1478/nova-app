@@ -16,14 +16,14 @@ import {
 } from 'lucide-react';
 
 export interface Task {
-  id: number;
-  project_id: number;
+  id: number | string;
+  project_id: number | string;
   project_name?: string;
   title: string;
   description?: string;
   status: 'Backlog' | 'To Do' | 'In Progress' | 'In Review' | 'Done';
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
-  assignee_id?: number;
+  assignee_id?: number | string;
   assignee_name?: string;
   assignee_avatar?: string;
   due_date?: string;
@@ -51,7 +51,7 @@ export default function KanbanBoard({
 }: {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
-  onTaskStatusChange: (taskId: number, newStatus: Task['status']) => void;
+  onTaskStatusChange: (taskId: number | string, newStatus: Task['status']) => void;
   onAddTask: (status: Task['status']) => void;
 }) {
   const getPriorityBadge = (priority: Task['priority']) => {
@@ -69,7 +69,7 @@ export default function KanbanBoard({
 
   const statusOrder: Task['status'][] = ['Backlog', 'To Do', 'In Progress', 'In Review', 'Done'];
 
-  const handleMove = (e: React.MouseEvent, taskId: number, currentStatus: Task['status'], direction: 'left' | 'right') => {
+  const handleMove = (e: React.MouseEvent, taskId: number | string, currentStatus: Task['status'], direction: 'left' | 'right') => {
     e.stopPropagation();
     const currentIndex = statusOrder.indexOf(currentStatus);
     const newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
