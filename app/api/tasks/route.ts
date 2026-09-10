@@ -6,6 +6,8 @@ import Task from '@/models/Task';
 import Project from '@/models/Project';
 import User from '@/models/User';
 
+import { createActivityLog } from '@/lib/activity';
+
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
@@ -136,6 +138,14 @@ export async function POST(req: NextRequest) {
         tags: tags || [],
       });
 
+      await createActivityLog({
+        userId: user.id,
+        action: 'TASK_CREATED',
+        details: `Created task "${title}"`,
+        projectId: project_id,
+        taskId: newTask._id.toString(),
+      });
+
       return NextResponse.json({ id: newTask._id.toString(), message: 'Task created' }, { status: 201 });
     }
 
@@ -158,6 +168,15 @@ export async function POST(req: NextRequest) {
     );
 
     const taskId = result.lastInsertRowid as number;
+
+    await createActivityLog({
+      userId: user.id,
+      action: 'TASK_CREATED',
+      details: `Created task "${title}"`,
+      projectId: project_id,
+      taskId,
+    });
+
     return NextResponse.json({ id: taskId, message: 'Task created successfully' }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });

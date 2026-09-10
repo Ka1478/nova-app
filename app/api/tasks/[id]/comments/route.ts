@@ -5,6 +5,7 @@ import connectMongoDB from '@/lib/mongodb';
 import Task from '@/models/Task';
 import User from '@/models/User';
 import mongoose from 'mongoose';
+import { createActivityLog } from '@/lib/activity';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -95,6 +96,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       task.comments.push(newComment);
       await task.save();
 
+      await createActivityLog({
+        userId: user.id,
+        action: 'COMMENT_ADDED',
+        details: `Commented on "${task.title}"`,
+        projectId: task.project_id?.toString(),
+        taskId: id,
+      });
+
       return NextResponse.json({
         comment: {
           ...newComment,
@@ -122,10 +131,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       VALUES (?, ?, ?)
     `).run(taskId, user.id, content.trim());
 
-    db.prepare(`
-      INSERT INTO activity_logs (project_id, task_id, user_id, action, details)
-      VALUES (?, ?, ?, 'COMMENT_ADDED', ?)
-    `).run(task.project_id, taskId, user.id, `Commented on "${task.title}"`);
+    await createActivityLog({
+      userId: user.id,
+      action: 'COMMENT_ADDED',
+      details: `Commented on "${task.title}"`,
+      projectId: task.project_id,
+      taskId,
+    });
 
     const newComment = db.prepare(`
       SELECT c.*, u.name as user_name, u.avatar_url as user_avatar, u.role as user_role

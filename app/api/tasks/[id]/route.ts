@@ -5,6 +5,7 @@ import connectMongoDB from '@/lib/mongodb';
 import Task from '@/models/Task';
 import Project from '@/models/Project';
 import User from '@/models/User';
+import { createActivityLog } from '@/lib/activity';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -108,6 +109,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
     if (process.env.MONGODB_URI) {
       await connectMongoDB();
+      const existingTask = await Task.findById(id).lean().catch(() => null);
+
       const updateData: any = {};
       if (title !== undefined) updateData.title = title;
       if (description !== undefined) updateData.description = description;
@@ -121,6 +124,25 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       if (position !== undefined) updateData.position = position;
 
       await Task.findByIdAndUpdate(id, updateData);
+
+      if (status && existingTask && status !== existingTask.status) {
+        await createActivityLog({
+          userId: user.id,
+          action: 'STATUS_CHANGE',
+          details: `Moved "${existingTask.title}" to ${status}`,
+          projectId: existingTask.project_id?.toString(),
+          taskId: id,
+        });
+      } else {
+        await createActivityLog({
+          userId: user.id,
+          action: 'TASK_UPDATED',
+          details: `Updated task "${title || existingTask?.title || 'task'}"`,
+          projectId: existingTask?.project_id?.toString(),
+          taskId: id,
+        });
+      }
+
       return NextResponse.json({ message: 'Task updated successfully' });
     }
 
@@ -156,15 +178,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     );
 
     if (status && status !== existingTask.status) {
-      db.prepare(`
-        INSERT INTO activity_logs (project_id, task_id, user_id, action, details)
-        VALUES (?, ?, ?, 'STATUS_CHANGE', ?)
-      `).run(
-        existingTask.project_id,
+      await createActivityLog({
+        userId: user.id,
+        action: 'STATUS_CHANGE',
+        details: `Moved "${existingTask.title}" to ${status}`,
+        projectId: existingTask.project_id,
         taskId,
-        user.id,
-        `Moved "${existingTask.title}" from ${existingTask.status} to ${status}`
-      );
+      });
     }
 
     return NextResponse.json({ message: 'Task updated successfully' });
@@ -184,6 +204,16 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
     if (process.env.MONGODB_URI) {
       await connectMongoDB();
+      const task = await Task.findById(id).lean().catch(() => null);
+      if (task) {
+        await createActivityLog({
+          userId: user.id,
+          action: 'TASK_DELETED',
+          details: `Deleted task "${task.title}"`,
+          projectId: task.project_id?.toString(),
+          taskId: id,
+        });
+      }
       await Task.findByIdAndDelete(id);
       return NextResponse.json({ message: 'Task deleted successfully' });
     }
@@ -194,6 +224,16 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
 
     const db = getDb();
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId) as any;
+    if (task) {
+      await createActivityLog({
+        userId: user.id,
+        action: 'TASK_DELETED',
+        details: `Deleted task "${task.title}"`,
+        projectId: task.project_id,
+        taskId,
+      });
+    }
     db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
 
     return NextResponse.json({ message: 'Task deleted successfully' });

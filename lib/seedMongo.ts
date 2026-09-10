@@ -2,6 +2,7 @@ import connectMongoDB from './mongodb';
 import User from '@/models/User';
 import Project from '@/models/Project';
 import Task from '@/models/Task';
+import ActivityLog from '@/models/ActivityLog';
 import bcrypt from 'bcryptjs';
 
 export async function autoSeedMongoDB() {
@@ -149,6 +150,34 @@ export async function autoSeedMongoDB() {
       due_date: '2026-09-22',
       estimated_hours: 20,
       tags: ['Mobile', 'Frontend'],
+    });
+
+    // Initial Activity Logs
+    await ActivityLog.create({
+      project_id: p1._id,
+      user_id: u2._id,
+      user_name: u2.name,
+      user_avatar: u2.avatar_url,
+      action: 'PROJECT_CREATED',
+      details: `Created project "${p1.name}"`,
+    });
+
+    await ActivityLog.create({
+      project_id: p1._id,
+      user_id: u4._id,
+      user_name: u4.name,
+      user_avatar: u4.avatar_url,
+      action: 'TASK_COMPLETED',
+      details: `Completed task "Design Mobile Auth & SSO Screen"`,
+    });
+
+    await ActivityLog.create({
+      project_id: p1._id,
+      user_id: u5._id,
+      user_name: u5.name,
+      user_avatar: u5.avatar_url,
+      action: 'STATUS_CHANGE',
+      details: `Moved "Offline SQLite Storage Sync Layer" to In Review`,
     });
 
     console.log('🎉 MongoDB Atlas Seeding Complete!');

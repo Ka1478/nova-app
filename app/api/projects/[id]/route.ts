@@ -5,6 +5,7 @@ import connectMongoDB from '@/lib/mongodb';
 import Project from '@/models/Project';
 import Task from '@/models/Task';
 import User from '@/models/User';
+import ActivityLog from '@/models/ActivityLog';
 import { autoSeedMongoDB } from '@/lib/seedMongo';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -74,6 +75,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       const completedTasks = tasks.filter((t: any) => t.status === 'Done').length;
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+      const activityLogsRaw = await ActivityLog.find({
+        $or: [{ project_id: id }, { project_id: project._id.toString() }]
+      }).sort({ createdAt: -1 }).limit(30).lean();
+
+      const activity = activityLogsRaw.map((log: any) => ({
+        id: log._id.toString(),
+        action: log.action,
+        details: log.details,
+        user_name: log.user_name || 'User',
+        user_avatar: log.user_avatar,
+        created_at: log.createdAt,
+      }));
+
       return NextResponse.json({
         project: {
           id: project._id.toString(),
@@ -92,7 +106,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         },
         members,
         tasks,
-        activity: [],
+        activity,
       });
     }
 

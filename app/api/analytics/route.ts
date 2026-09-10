@@ -4,6 +4,7 @@ import connectMongoDB from '@/lib/mongodb';
 import Project from '@/models/Project';
 import Task from '@/models/Task';
 import User from '@/models/User';
+import ActivityLog from '@/models/ActivityLog';
 import { autoSeedMongoDB } from '@/lib/seedMongo';
 
 export async function GET(req: NextRequest) {
@@ -63,6 +64,16 @@ export async function GET(req: NextRequest) {
         };
       });
 
+      const recentActivityLogs = await ActivityLog.find().sort({ createdAt: -1 }).limit(10).lean();
+      const recentActivity = recentActivityLogs.map((log: any) => ({
+        id: log._id.toString(),
+        action: log.action,
+        details: log.details,
+        user_name: log.user_name || 'User',
+        user_avatar: log.user_avatar,
+        created_at: log.createdAt,
+      }));
+
       return NextResponse.json({
         summary: {
           totalProjects,
@@ -77,7 +88,7 @@ export async function GET(req: NextRequest) {
         priorityCounts,
         projectsWithProgress,
         memberWorkload,
-        recentActivity: [],
+        recentActivity,
       });
     }
 

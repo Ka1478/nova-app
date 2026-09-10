@@ -30,37 +30,24 @@ export default function Header({
   const [searchTerm, setSearchTerm] = useState('');
   const [showDemoMenu, setShowDemoMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(3);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: 'Project Created',
-      description: 'Project "Diary redesign" was created successfully.',
-      time: '10m ago',
-      unread: true,
-      icon: FolderKanban,
-      iconColor: 'text-brand-400 bg-brand-500/10 border-brand-500/20',
-    },
-    {
-      id: 2,
-      title: 'Task Status Updated',
-      description: 'Marcus moved "Offline SQLite Storage Sync" to In Review.',
-      time: '35m ago',
-      unread: true,
-      icon: CheckCircle2,
-      iconColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-    },
-    {
-      id: 3,
-      title: 'New Comment',
-      description: 'Sophia Chen commented on "Push Notification Engine".',
-      time: '1h ago',
-      unread: true,
-      icon: MessageSquare,
-      iconColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-    },
-  ]);
+  const fetchNotifications = () => {
+    fetch('/api/notifications')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.notifications) {
+          setNotifications(data.notifications);
+          setUnreadCount(data.unreadCount || 0);
+        }
+      })
+      .catch((err) => console.error(err));
+  };
+
+  React.useEffect(() => {
+    fetchNotifications();
+  }, []);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -168,7 +155,10 @@ export default function Header({
         {/* Clickable Notifications Dropdown */}
         <div className="relative">
           <button
-            onClick={() => setShowNotifications(!showNotifications)}
+            onClick={() => {
+              if (!showNotifications) fetchNotifications();
+              setShowNotifications(!showNotifications);
+            }}
             className="relative p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-slate-300 transition"
             title="Notifications"
           >
@@ -205,9 +195,10 @@ export default function Header({
               </div>
 
               <div className="divide-y divide-slate-800 max-h-80 overflow-y-auto">
-                {notifications.map((n) => {
-                  const Icon = n.icon;
-                  return (
+                {notifications.length === 0 ? (
+                  <p className="text-slate-500 text-xs text-center py-6">No recent notifications</p>
+                ) : (
+                  notifications.map((n) => (
                     <div
                       key={n.id}
                       onClick={() => setShowNotifications(false)}
@@ -215,9 +206,11 @@ export default function Header({
                         n.unread ? 'bg-slate-850/50' : ''
                       }`}
                     >
-                      <div className={`p-2 rounded-xl border shrink-0 mt-0.5 ${n.iconColor}`}>
-                        <Icon className="w-3.5 h-3.5" />
-                      </div>
+                      <img
+                        src={n.user_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${n.user_name || 'User'}`}
+                        alt={n.user_name}
+                        className="w-7 h-7 rounded-full shrink-0 object-cover border border-slate-700 mt-0.5"
+                      />
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <h4 className="text-xs font-semibold text-slate-200">{n.title}</h4>
@@ -226,8 +219,8 @@ export default function Header({
                         <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{n.description}</p>
                       </div>
                     </div>
-                  );
-                })}
+                  ))
+                )}
               </div>
 
               <div className="p-2 border-t border-slate-800 bg-slate-850 text-center">

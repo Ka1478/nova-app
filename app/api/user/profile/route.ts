@@ -3,6 +3,7 @@ import getDb from '@/lib/db';
 import { getUserFromRequest, signToken } from '@/lib/auth';
 import connectMongoDB from '@/lib/mongodb';
 import User from '@/models/User';
+import { createActivityLog } from '@/lib/activity';
 
 async function handleProfileUpdate(req: NextRequest) {
   try {
@@ -27,6 +28,12 @@ async function handleProfileUpdate(req: NextRequest) {
       if (!updatedUser) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
+
+      await createActivityLog({
+        userId: user.id,
+        action: 'PROFILE_UPDATED',
+        details: `Updated profile picture and details for ${name}`,
+      });
 
       const payload = {
         id: updatedUser._id.toString(),
@@ -56,6 +63,12 @@ async function handleProfileUpdate(req: NextRequest) {
       SET name = ?, avatar_url = ?, department = ?
       WHERE id = ?
     `).run(name, avatar_url, department, user.id);
+
+    await createActivityLog({
+      userId: user.id,
+      action: 'PROFILE_UPDATED',
+      details: `Updated profile picture and details for ${name}`,
+    });
 
     const updatedUser = db.prepare('SELECT id, name, email, role, department, avatar_url FROM users WHERE id = ?').get(user.id) as any;
 

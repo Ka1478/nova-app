@@ -6,6 +6,7 @@ import Project from '@/models/Project';
 import Task from '@/models/Task';
 import User from '@/models/User';
 import { autoSeedMongoDB } from '@/lib/seedMongo';
+import { createActivityLog } from '@/lib/activity';
 
 export async function GET(req: NextRequest) {
   try {
@@ -149,6 +150,13 @@ export async function POST(req: NextRequest) {
         members,
       });
 
+      await createActivityLog({
+        userId: user.id,
+        action: 'PROJECT_CREATED',
+        details: `Created project "${name}"`,
+        projectId: newProj._id.toString(),
+      });
+
       return NextResponse.json({ id: newProj._id.toString(), message: 'Project created' }, { status: 201 });
     }
 
@@ -186,6 +194,13 @@ export async function POST(req: NextRequest) {
         }
       });
     }
+
+    await createActivityLog({
+      userId: user.id,
+      action: 'PROJECT_CREATED',
+      details: `Created project "${name}"`,
+      projectId,
+    });
 
     return NextResponse.json({ id: projectId, message: 'Project created successfully' }, { status: 201 });
   } catch (error: any) {
