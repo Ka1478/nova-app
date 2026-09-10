@@ -1,28 +1,45 @@
 import Database from 'better-sqlite3';
+import { createClient, Client } from '@libsql/client';
 import path from 'path';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
 
-// Support Render persistent disk (/data) or custom DATA_DIR, fallback to cwd or /tmp for Vercel
-const dataDir = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp' : process.cwd());
+const isVercel = !!process.env.VERCEL || process.env.NEXT_PHASE === 'phase-production-build';
+const dataDir = process.env.DATA_DIR || (isVercel ? '/tmp' : process.cwd());
 const dbPath = path.join(dataDir, 'nova.db');
 
-let dbInstance: Database.Database | null = null;
+let betterDbInstance: Database.Database | null = null;
+let tursoClientInstance: Client | null = null;
+
+const tursoUrl = process.env.TURSO_DATABASE_URL || process.env.LIBSQL_DATABASE_URL;
+const tursoToken = process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN;
 
 export function getDb(): Database.Database {
-  if (!dbInstance) {
-    dbInstance = new Database(dbPath);
-    dbInstance.pragma('journal_mode = WAL');
-    dbInstance.pragma('foreign_keys = ON');
-    initTables(dbInstance);
+  if (!betterDbInstance) {
+    betterDbInstance = new Database(dbPath);
+    betterDbInstance.pragma('journal_mode = WAL');
+    betterDbInstance.pragma('foreign_keys = ON');
+    initTables(betterDbInstance);
 
-    // Auto-seed if database is empty
-    const userCount = (dbInstance.prepare('SELECT COUNT(*) as c FROM users').get() as any)?.c || 0;
+    const userCount = (betterDbInstance.prepare('SELECT COUNT(*) as c FROM users').get() as any)?.c || 0;
     if (userCount === 0) {
-      autoSeed(dbInstance);
+      autoSeed(betterDbInstance);
     }
   }
-  return dbInstance;
+  return betterDbInstance;
+}
+
+export function getTursoClient(): Client | null {
+  if (tursoUrl) {
+    if (!tursoClientInstance) {
+      tursoClientInstance = createClient({
+        url: tursoUrl,
+        authToken: tursoToken,
+      });
+    }
+    return tursoClientInstance;
+  }
+  return null;
 }
 
 function initTables(db: Database.Database) {
@@ -146,10 +163,6 @@ function autoSeed(db: Database.Database) {
     const t2 = insertTask.run(p1, 'Implement Push Notification Engine', 'Setup Firebase Cloud Messaging integration for real-time task updates on iOS/Android.', 'In Progress', 'High', u3, u2, '2026-09-15', 24, 12, JSON.stringify(['Mobile', 'Backend']), 1).lastInsertRowid as number;
     const t3 = insertTask.run(p1, 'Offline SQLite Storage Sync Layer', 'Persist offline task edits locally and auto-resolve sync conflicts when back online.', 'In Review', 'Urgent', u5, u3, '2026-09-12', 32, 30, JSON.stringify(['Core', 'Database']), 1).lastInsertRowid as number;
     const t4 = insertTask.run(p1, 'Gesture-based Drag & Drop Kanban', 'Build smooth touch drag gestures for moving task cards between swimlanes.', 'To Do', 'Medium', u5, u4, '2026-09-22', 20, 0, JSON.stringify(['Mobile', 'Frontend']), 2).lastInsertRowid as number;
-    const t5 = insertTask.run(p1, 'App Store & Play Store Assets', 'Generate app screenshots, feature graphic banners, and compliance disclosures.', 'Backlog', 'Low', u4, u2, '2026-10-05', 12, 0, JSON.stringify(['Design', 'Launch']), 1).lastInsertRowid as number;
-
-    const t6 = insertTask.run(p2, 'Provision AWS EKS Clusters with Terraform', 'Infrastructure as Code scripts for multi-zone Kubernetes clusters with auto-scaling.', 'Done', 'Urgent', u3, u1, '2026-08-25', 40, 42, JSON.stringify(['DevOps', 'Cloud']), 1).lastInsertRowid as number;
-    const t7 = insertTask.run(p2, 'Zero-Downtime Database Migration Script', 'Migrate production database schemas with live CDC streaming replication.', 'In Progress', 'Urgent', u3, u3, '2026-09-18', 36, 20, JSON.stringify(['Database', 'Migration']), 1).lastInsertRowid as number;
 
     const insertComment = db.prepare('INSERT INTO comments (task_id, user_id, content, created_at) VALUES (?, ?, ?, ?)');
     insertComment.run(t2, u2, 'Great progress on this! Make sure we include user preference toggles for quiet hours.', '2026-09-08 10:15:00');
@@ -158,7 +171,6 @@ function autoSeed(db: Database.Database) {
     const insertActivity = db.prepare('INSERT INTO activity_logs (project_id, task_id, user_id, action, details, created_at) VALUES (?, ?, ?, ?, ?, ?)');
     insertActivity.run(p1, t3, u5, 'STATUS_CHANGE', 'Moved task "Offline SQLite Storage Sync Layer" from In Progress to In Review', '2026-09-09 14:18:00');
     insertActivity.run(p1, t2, u3, 'COMMENT_ADDED', 'Added a comment to "Implement Push Notification Engine"', '2026-09-08 11:30:00');
-    insertActivity.run(p1, null, u2, 'PROJECT_CREATED', 'Created new project "NOVA Mobile App v2.0"', '2026-08-01 09:00:00');
   } catch (err) {
     console.error('Auto seed failed:', err);
   }
