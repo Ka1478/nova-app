@@ -223,7 +223,9 @@ export default function DashboardPage() {
                       <span className="font-semibold text-white">{act.user_name}</span> {act.details}
                     </p>
                     <span className="text-[10px] text-slate-500 mt-0.5 block">
-                      {new Date(act.created_at).toLocaleString()}
+                      {act.created_at && !isNaN(new Date(act.created_at).getTime())
+                        ? new Date(act.created_at).toLocaleString()
+                        : 'Recently'}
                     </span>
                   </div>
                 </div>

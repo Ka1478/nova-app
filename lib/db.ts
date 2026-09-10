@@ -25,6 +25,23 @@ export function getDb(): Database.Database {
     if (userCount === 0) {
       autoSeed(betterDbInstance);
     }
+
+    const actCount = (betterDbInstance.prepare('SELECT COUNT(*) as c FROM activity_logs').get() as any)?.c || 0;
+    if (actCount === 0) {
+      try {
+        const users = betterDbInstance.prepare('SELECT id, name FROM users LIMIT 3').all() as any[];
+        const projects = betterDbInstance.prepare('SELECT id, name FROM projects LIMIT 1').all() as any[];
+        if (users.length > 0) {
+          const insertAct = betterDbInstance.prepare('INSERT INTO activity_logs (project_id, user_id, action, details) VALUES (?, ?, ?, ?)');
+          insertAct.run(projects[0]?.id || null, users[0].id, 'PROJECT_CREATED', `Created project "${projects[0]?.name || 'NOVA System'}"`);
+          if (users[1]) {
+            insertAct.run(projects[0]?.id || null, users[1].id, 'TASK_COMPLETED', 'Completed task "Design Mobile Auth & SSO Screen"');
+          }
+        }
+      } catch (e) {
+        console.error('Activity seed error:', e);
+      }
+    }
   }
   return betterDbInstance;
 }
